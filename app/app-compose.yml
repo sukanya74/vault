@@ -1,0 +1,60 @@
+networks:
+  app-internal:
+    driver: bridge
+    name: app-internal
+
+  vault-agent-bridge:
+    external: true
+    name: vault-agent-bridge
+
+volumes:
+  postgres-data:
+  vault_agent-secrets:
+    external: true
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: app-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: appdb
+      PGDATA: /var/lib/postgresql/data/pgdata
+    env_file:
+      - ./postgres-bootstrap.env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - vault_agent-secrets:/run/secrets:ro
+    networks:
+      - app-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d appdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app-fastapi
+    restart: unless-stopped
+    volumes:
+      - vault_agent-secrets:/run/secrets:ro
+    networks:
+      - app-internal
+      - vault-agent-bridge
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
