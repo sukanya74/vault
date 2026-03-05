@@ -1,0 +1,10 @@
+{{- with secret "secret/data/app/database" -}}
+# Rendered by Vault Agent — DO NOT EDIT MANUALLY
+DB_USER={{ .Data.data.username }}
+DB_PASSWORD={{ .Data.data.password }}
+DB_HOST=postgres
+DB_PORT=5432
+DB_NAME=appdb
+DATABASE_URL=postgresql://{{ .Data.data.username }}:{{ .Data.data.password }}@postgres:5432/appdb
+{{- end }}
+
