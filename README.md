@@ -14,6 +14,8 @@ Vault returns a JSON document containing **unseal keys and a root token** requir
 The example shown in this repository contains **dummy placeholder values only**.
 Real Vault keys and tokens must **never be stored in source control systems like GitHub**.
 
+File path: `vault/vault-keys.json`
+
 ---
 
 # Example Vault Initialization Output
