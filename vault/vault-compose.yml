@@ -1,3 +1,10 @@
+# =============================================================
+# PHASE 2 — Normal operation
+# Run this every time after bootstrap is complete.
+# Vault Agent expects role_id and secret_id to already exist
+# in ./agent/ (provisioned during Phase 1 bootstrap).
+# =============================================================
+
 networks:
   vault-internal:
     driver: bridge
@@ -8,11 +15,16 @@ networks:
 
 volumes:
   vault-data:
-  vault-logs:
+    name: vault-data
   agent-secrets:
+    name: agent-secrets
 
 services:
 
+  # -----------------------------------------------------------
+  # Vault Server — just runs, nothing else
+  # Unseal is done manually by the operator after start
+  # -----------------------------------------------------------
   vault:
     image: hashicorp/vault:1.17
     container_name: vault-server
@@ -22,56 +34,30 @@ services:
       SKIP_SETCAP: "true"
     volumes:
       - vault-data:/vault/data
-      - vault-logs:/vault/logs
       - ./vault-config.hcl:/vault/config/vault.hcl:ro
       - ./policies:/vault/policies:ro
     networks:
       - vault-internal
     ports:
       - "8200:8200"
-    healthcheck:
-      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
     command: vault server -config=/vault/config/vault.hcl
 
+  # -----------------------------------------------------------
+  # Vault Agent — only authenticates and renders secrets
+  # Never touches init, unseal, or policy setup
+  # Requires role_id and secret_id to exist in ./agent/
+  # -----------------------------------------------------------
   vault-agent:
     image: hashicorp/vault:1.17
     container_name: vault-agent
     restart: unless-stopped
-    depends_on:
-      vault:
-        condition: service_healthy
     environment:
       VAULT_ADDR: "http://vault:8200"
       SKIP_SETCAP: "true"
     volumes:
       - ./agent:/vault/agent:ro
-      - ./policies:/vault/policies:ro
       - agent-secrets:/vault/secrets
-      - vault-data:/vault/data:ro
     networks:
       - vault-internal
       - vault-agent-bridge
-    command: >
-      sh -c "
-        echo 'Waiting for Vault to initialize...';
-        until vault status -address=http://vault:8200 2>/dev/null | grep -q 'Initialized.*true'; do
-          sleep 3;
-        done;
-        echo 'Waiting for Vault to unseal...';
-        until vault status -address=http://vault:8200 2>/dev/null | grep -q 'Sealed.*false'; do
-          sleep 3;
-        done;
-        echo 'Starting Vault Agent...';
-        vault agent -config=/vault/agent/agent.hcl -log-level=info
-      "
-    healthcheck:
-      test: ["CMD", "test", "-f", "/vault/secrets/.ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 30s
-
+    command: vault agent -config=/vault/agent/agent.hcl -log-level=info

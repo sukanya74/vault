@@ -1,1 +1,8 @@
 vault/vault-keys.json
+vault/agent/role_id
+vault/agent/secret_id
+vault/agent/sink_token
+app/postgres-bootstrap.env
+__pycache__/
+*.pyc
+.env
